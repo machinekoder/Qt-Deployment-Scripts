@@ -54,7 +54,7 @@ class QtDeployment:
                                                           name = self.releaseName,
                                                           body = self.releaseDescription,
                                                           prerelease = self.prerelease,
-                                                          draf = self.draft,
+                                                          draft = self.draft,
                                                           target_commitish = self.gitTag)
         else:
             self.release.edit(tag_name = releaseTag,
@@ -97,6 +97,7 @@ class QtDeployment:
         assetType = mimetypes.guess_type(self.zipName)
         assetFile = open(self.zipName, 'r')
 
+        asset = None
         if assetFile:
             try:
                 asset = self.release.upload_asset(content_type = assetType,
@@ -105,6 +106,10 @@ class QtDeployment:
             except:
                 pass
             assetFile.close()
+
+        if not asset:
+            sys.stderr.write("uploading file failed\n")
+            exit(1)
             
         sys.stdout.write("done\n")
             
@@ -164,9 +169,9 @@ class QtDeployment:
             for root, dirs, files in os.walk(self.outQmlDir):
                     for f in files:
                         if ('d' + self.libraryExtension) in f:
-                            os.remove(f)
+                            os.remove(os.path.join(root, f))
             # create zip file
-            with zipfile.ZipFile(self.zipName, 'w') as myzip:
+            with zipfile.ZipFile(self.zipName, 'w', zipfile.ZIP_DEFLATED) as myzip:
                 for root, dirs, files in os.walk(self.deploymentDir):
                     for f in files:
                         myzip.write(os.path.join(root, f))
@@ -224,8 +229,8 @@ class QtDeployment:
         parser.add_argument('-v', '--version', help='Version of the application', required=None)
         parser.add_argument('-u', '--user', help='GitHub user name', default=None)
         parser.add_argument('-p', '--password', help='GitHub password', default=None)
-        parser.add_argument('-dr', '--draft', help='Publish on GitHub as draft', default=None)
-        parser.add_argument('-pr', '--prerelease', help='Publish on GitHub as pre-release', default=None)
+        parser.add_argument('-dr', '--draft', help='Publish on GitHub as draft', action='store_true')
+        parser.add_argument('-pr', '--prerelease', help='Publish on GitHub as pre-release', action='store_true')
         parser.add_argument('-t', '--tag', help='Git tag of the release', default=None)
         parser.add_argument('--deploy', help='Deploy the application to the output directory', action='store_true')
         parser.add_argument('--publish', help='Upload the application to GitHub', action='store_true')
