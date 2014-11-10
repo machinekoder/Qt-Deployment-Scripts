@@ -3,17 +3,32 @@ Documentation, License etc.
 
 @package github3_test
 '''
-import mimetypes
 import os
-import github3
+import sys
+import stat
+import mimetypes
 import shutil
 import zipfile
 import tarfile
 import getpass
 import ConfigParser
-import argparse
-import sys
+import argparse  
+import github3
 
+def copy(src, dst):
+    if os.path.islink(src):
+        linkto = os.readlink(src)
+        os.symlink(linkto, dst)
+    else:
+        shutil.copy(src,dst)
+        
+def copyLib(src, dstDir):
+    srcDir = os.path.dirname(src)
+    srcName = os.path.basename(src)
+    for f in reversed(os.listdir(srcDir)):
+        if srcName in f:
+            copy(os.path.join(srcDir, f), os.path.join(dstDir, f))
+        
 class QtDeployment:
     def __init__(self):
         self.gh = None
@@ -134,13 +149,13 @@ class QtDeployment:
         
         for lib in self.qtLibs:
             libName = self.libraryPrefix + lib + self.libraryExtension
-            shutil.copyfile(os.path.join(self.qtLibDir, libName),
-                                os.path.join(self.outLibDir, libName))
+            inPath = os.path.join(self.qtLibDir, libName)
+            copyLib(inPath, self.outLibDir)
             
         for lib in self.libs:
             libName = lib + self.libraryExtension
-            shutil.copyfile(os.path.join(self.libDir, libName),
-                                os.path.join(self.outLibDir, libName))
+            inPath = os.path.join(self.libDir, libName)
+            copyLib(inPath, self.outLibDir)
         
         try:
             os.makedirs(self.outPluginDir)
@@ -149,17 +164,29 @@ class QtDeployment:
         
         for plugin in self.platformPlugins:
             pluginName = self.libraryPrefix + plugin + self.libraryExtension
-            shutil.copyfile(os.path.join(self.pluginDir, pluginName),
-                                os.path.join(self.outPluginDir, pluginName))
+            inPath = os.path.join(self.pluginDir, pluginName)
+            outPath = os.path.join(self.outPluginDir, pluginName)
+            shutil.copyfile(inPath, outPath)
         
-        shutil.copyfile(os.path.join(self.applicationDir, self.target),
-                            os.path.join(self.deploymentDir, self.target))
+        inFile = os.path.join(self.applicationDir, self.target)
+        targetFile = os.path.join(self.deploymentDir, self.target)
+        shutil.copyfile(inFile, targetFile)
+        if (self.platform == 'linux_x86') or (self.platform == 'linux_x64'):
+            st = os.stat(targetFile)
+            os.chmod(targetFile, st.st_mode | stat.S_IEXEC)
         
         for qmlplugin in self.qmlPlugins:
             targetPath = os.path.join(self.outQmlDir, qmlplugin)
             if os.path.exists(targetPath):
                 shutil.rmtree(targetPath)
             shutil.copytree(os.path.join(self.qmlDir, qmlplugin), targetPath)
+            
+        # remove unnecessary files:
+        for root, dirs, files in os.walk(self.outQmlDir):
+                for f in files:
+                    if (f == 'plugins.qmltypes'):
+                        os.remove(os.path.join(root, f))
+                            
         sys.stdout.write("done\n")
             
         sys.stdout.write("compressing files...")
@@ -286,7 +313,7 @@ class QtDeployment:
         self.qmlDir = os.path.join(self.qtDir, 'qml')
         self.pluginDir = os.path.join(self.qtDir, 'plugins/platforms')
         self.outLibDir = self.deploymentDir
-        self.outPluginDir = os.path.join(self.deploymentDir, 'plugins')
+        self.outPluginDir = os.path.join(self.deploymentDir, 'platforms')
         self.outQmlDir = os.path.join(self.deploymentDir, 'qml')
         
         f = open(self.descriptionFile)
