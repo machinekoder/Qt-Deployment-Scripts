@@ -12,7 +12,8 @@ import zipfile
 import tarfile
 import getpass
 import ConfigParser
-import argparse  
+import argparse
+from subprocess import call
 import github3
 
 def copy(src, dst):
@@ -131,12 +132,37 @@ class QtDeployment:
     def cleanup(self):
         sys.stdout.write("startin cleanup...")
         sys.stdout.flush()
-            
+
         if os.path.exists(self.deploymentDir):
-                shutil.rmtree(self.deploymentDir)
-                
+            shutil.rmtree(self.deploymentDir)
+
+        if os.path.isfile(self.zipName):
+            os.remove(self.zipName)
+
         sys.stdout.write("done\n")
             
+    def deployMac(self):
+        self.cleanup()
+
+        sys.stdout.write("creating disk image...")
+        sys.stdout.flush()
+        macutil = os.path.join(self.qtBinDir, 'macdeployqt')
+        targetBundle = os.path.join(self.applicationDir, self.target)
+        call([macutil, targetBundle, '-qmldir=' + self.qmlSourceDir, '-dmg'])
+        sys.stdout.write("done\n")
+
+        sys.stdout.write("moving disk image...")
+        sys.stdout.flush()
+        inPath = os.path.join(self.applicationDir, self.dmgName)
+        shutil.copyfile(inPath, self.zipName)
+        os.remove(inPath)
+        sys.stdout.write("done\n")
+
+        sys.stdout.write("cleaning app bundle...")
+        sys.stdout.flush()
+        shutil.rmtree(targetBundle)
+        sys.stdout.write("done\n")
+
     def deployFiles(self):
         self.cleanup()
         
@@ -231,13 +257,16 @@ class QtDeployment:
             self.version = None
         self.platform = config.get('Deployment', 'platform').strip('"')
         self.qtDir = os.path.expanduser(config.get('Deployment', 'qtDir').strip('"'))
-        self.libDir = os.path.expanduser(config.get('Deployment', 'libDir').strip('"'))
         self.applicationDir = os.path.expanduser(config.get('Deployment', 'applicationDir').strip('"'))
-        self.deploymentDir = os.path.expanduser(config.get('Deployment', 'deploymentDir').strip('"'))
-        self.qmlPlugins = config.get('Deployment', 'qmlPlugins').strip('"').split(',')
-        self.platformPlugins = config.get('Deployment','platformPlugins').strip('"').split(',')
-        self.qtLibs = config.get('Deployment', 'qtLibs').strip('"').split(',')
-        self.libs = config.get('Deployment', 'libs').strip('"').split(',')
+        if self.platform == "mac":
+            self.qmlSourceDir = os.path.expanduser(config.get('Deployment', 'qmlSourceDir').strip('"'))
+        else:
+            self.deploymentDir = os.path.expanduser(config.get('Deployment', 'deploymentDir').strip('"'))
+            self.libDir = os.path.expanduser(config.get('Deployment', 'libDir').strip('"'))
+            self.qmlPlugins = config.get('Deployment', 'qmlPlugins').strip('"').split(',')
+            self.platformPlugins = config.get('Deployment','platformPlugins').strip('"').split(',')
+            self.qtLibs = config.get('Deployment', 'qtLibs').strip('"').split(',')
+            self.libs = config.get('Deployment', 'libs').strip('"').split(',')
         try:
             if not self.userName:
                 self.userName = config.get('GitHub', 'user').strip('"')
@@ -305,6 +334,12 @@ class QtDeployment:
             self.libraryPrefix = 'lib'
             self.zipName = zipNameBase + '.tar.gz'
             self.qtLibDir = os.path.join(self.qtDir, 'lib')
+        elif (self.platform == 'mac'):
+            self.targetExtension = '.app'
+            self.qtBinDir = os.path.join(self.qtDir, 'bin')
+            self.zipName = zipNameBase + '.dmg'
+            self.dmgName = self.name + '.dmg'
+            self.deploymentDir = ''
         else:
             self.targetExtension = ''
             self.libraryExtension = ''
@@ -332,7 +367,10 @@ class QtDeployment:
         self.parseConfig()
         self.createVars()
         if self.deploy:
-            self.deployFiles()
+            if self.platform == 'mac':
+                self.deployMac()
+            else:
+                self.deployFiles()
         if self.publish:
             self.checkCredentials()
             self.loginToGitHub()
