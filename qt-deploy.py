@@ -195,7 +195,8 @@ class QtDeployment:
             # remove debug libraries
             for root, dirs, files in os.walk(self.outQmlDir):
                     for f in files:
-                        if ('d' + self.libraryExtension) in f:
+                        if (('d' + self.libraryExtension) in f)  \
+                            or (('d.pdb') in f):
                             os.remove(os.path.join(root, f))
             # create zip file
             with zipfile.ZipFile(self.zipName, 'w', zipfile.ZIP_DEFLATED) as myzip:
