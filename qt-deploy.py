@@ -201,17 +201,19 @@ class QtDeployment:
             st = os.stat(targetFile)
             os.chmod(targetFile, st.st_mode | stat.S_IEXEC)
         
-        for qmlplugin in self.qmlPlugins:
-            targetPath = os.path.join(self.outQmlDir, qmlplugin)
-            if os.path.exists(targetPath):
-                shutil.rmtree(targetPath)
-            shutil.copytree(os.path.join(self.qmlDir, qmlplugin), targetPath)
+        if self.qmlPlugins[0] != '':
+            for qmlplugin in self.qmlPlugins:
+                targetPath = os.path.join(self.outQmlDir, qmlplugin)
+                if os.path.exists(targetPath):
+                    shutil.rmtree(targetPath)
+                shutil.copytree(os.path.join(self.qmlDir, qmlplugin), targetPath)
 
-        for qtplugin in self.qtPlugins:
-            targetPath = os.path.join(self.outPluginDir, qtplugin)
-            if os.path.exists(targetPath):
-                shutil.rmtree(targetPath)
-            shutil.copytree(os.path.join(self.pluginDir, qtplugin), targetPath)
+        if self.qtPlugins[0] != '':
+            for qtplugin in self.qtPlugins:
+                targetPath = os.path.join(self.outPluginDir, qtplugin)
+                if os.path.exists(targetPath):
+                    shutil.rmtree(targetPath)
+                shutil.copytree(os.path.join(self.pluginDir, qtplugin), targetPath)
             
         # remove unnecessary files:
         for root, dirs, files in os.walk(self.outQmlDir):
