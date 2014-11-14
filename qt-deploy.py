@@ -23,12 +23,18 @@ def copy(src, dst):
     else:
         shutil.copy(src,dst)
         
-def copyLib(src, dstDir):
+def copyLib(src, dstDir, version=-1):
     srcDir = os.path.dirname(src)
     srcName = os.path.basename(src)
-    for f in reversed(os.listdir(srcDir)):
-        if srcName in f:
-            copy(os.path.join(srcDir, f), os.path.join(dstDir, f))
+    if version == -1:
+        for f in reversed(os.listdir(srcDir)):
+            if srcName in f:
+                copy(os.path.join(srcDir, f), os.path.join(dstDir, f))
+    else:
+        srcNameExtended = srcName + '.' + str(version)
+        for f in reversed(os.listdir(srcDir)):
+            if srcNameExtended in f:
+                copy(os.path.join(srcDir, f), os.path.join(dstDir, f))
         
 class QtDeployment:
     def __init__(self):
@@ -174,14 +180,28 @@ class QtDeployment:
             pass
         
         for lib in self.qtLibs:
+            # if version os specified copy only libs with this version
+            version = -1
+            libSplit = lib.split(':')
+            lib = libSplit[0]
+            if len(libSplit) > 1:
+                version = int(libSplit[1])
+                
             libName = self.libraryPrefix + lib + self.libraryExtension
             inPath = os.path.join(self.qtLibDir, libName)
             copyLib(inPath, self.outLibDir)
             
         for lib in self.libs:
+            # if version os specified copy only libs with this version
+            version = -1
+            libSplit = lib.split(':')
+            lib = libSplit[0]
+            if len(libSplit) > 1:
+                version = int(libSplit[1])
+                
             libName = lib + self.libraryExtension
             inPath = os.path.join(self.libDir, libName)
-            copyLib(inPath, self.outLibDir)
+            copyLib(inPath, self.outLibDir, version)
         
         try:
             os.makedirs(self.outPlatformsDir)
@@ -239,6 +259,12 @@ class QtDeployment:
                         myzip.write(os.path.join(root, f))
                 myzip.close()
         elif (self.platform == 'linux_x86') or (self.platform == 'linux_x64'):
+            # strip debug information
+            for root, dirs, files in os.walk(self.deploymentDir):
+                    for f in files:
+                        if ((self.libraryExtension) in f) \
+                            or (f == self.target):
+                            call(['strip', os.path.join(root, f)])
             # create run.sh
             runFilePath = os.path.join(self.deploymentDir, 'run.sh')
             runFile = open(runFilePath, 'w')
