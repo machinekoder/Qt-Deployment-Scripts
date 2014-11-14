@@ -270,7 +270,7 @@ class QtDeployment:
             runFile = open(runFilePath, 'w')
             if runFile:
                 runFile.write('#!/bin/bash\n')
-                runFile.write('LD_LIBRARY_PATH=`pwd`\n')
+                runFile.write('export LD_LIBRARY_PATH=`pwd`\n')
                 runFile.write('./machinekit-client\n')
                 runFile.close()
                 st = os.stat(runFilePath)
