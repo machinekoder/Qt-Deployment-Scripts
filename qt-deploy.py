@@ -64,7 +64,7 @@ class QtDeployment:
         
         releaseTag = self.createReleaseTag(self.releaseName)
         self.release = None
-        for r in self.repository.iter_releases():
+        for r in self.repository.releases():
             if (r.tag_name == releaseTag):
                 self.release = r
                 if self.debug:
