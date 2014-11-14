@@ -184,14 +184,14 @@ class QtDeployment:
             copyLib(inPath, self.outLibDir)
         
         try:
-            os.makedirs(self.outPluginDir)
+            os.makedirs(self.outPlatformsDir)
         except WindowsError:    # ignore error on windows
             pass
         
         for plugin in self.platformPlugins:
             pluginName = self.libraryPrefix + plugin + self.libraryExtension
-            inPath = os.path.join(self.pluginDir, pluginName)
-            outPath = os.path.join(self.outPluginDir, pluginName)
+            inPath = os.path.join(self.platformsDir, pluginName)
+            outPath = os.path.join(self.outPlatformsDir, pluginName)
             shutil.copyfile(inPath, outPath)
         
         inFile = os.path.join(self.applicationDir, self.target)
@@ -206,6 +206,12 @@ class QtDeployment:
             if os.path.exists(targetPath):
                 shutil.rmtree(targetPath)
             shutil.copytree(os.path.join(self.qmlDir, qmlplugin), targetPath)
+
+        for qtplugin in self.qtPlugins:
+            targetPath = os.path.join(self.outPluginDir, qtplugin)
+            if os.path.exists(targetPath):
+                shutil.rmtree(targetPath)
+            shutil.copytree(os.path.join(self.pluginDir, qtplugin), targetPath)
             
         # remove unnecessary files:
         for root, dirs, files in os.walk(self.outQmlDir):
@@ -219,7 +225,7 @@ class QtDeployment:
         sys.stdout.flush()
         if (self.platform == 'windows_x86') or (self.platform == 'windows_x64'):
             # remove debug libraries
-            for root, dirs, files in os.walk(self.outQmlDir):
+            for root, dirs, files in os.walk(self.deploymentDir):
                     for f in files:
                         if (('d' + self.libraryExtension) in f)  \
                             or (('d.pdb') in f):
@@ -264,6 +270,7 @@ class QtDeployment:
             self.deploymentDir = os.path.expanduser(config.get('Deployment', 'deploymentDir').strip('"'))
             self.libDir = os.path.expanduser(config.get('Deployment', 'libDir').strip('"'))
             self.qmlPlugins = config.get('Deployment', 'qmlPlugins').strip('"').split(',')
+            self.qtPlugins = config.get('Deployment', 'qtPlugins').strip('"').split(',')
             self.platformPlugins = config.get('Deployment','platformPlugins').strip('"').split(',')
             self.qtLibs = config.get('Deployment', 'qtLibs').strip('"').split(',')
             self.libs = config.get('Deployment', 'libs').strip('"').split(',')
@@ -347,9 +354,11 @@ class QtDeployment:
         
         self.target = self.name + self.targetExtension
         self.qmlDir = os.path.join(self.qtDir, 'qml')
-        self.pluginDir = os.path.join(self.qtDir, 'plugins/platforms')
+        self.pluginDir = os.path.join(self.qtDir, 'plugins')
+        self.platformsDir = os.path.join(self.qtDir, 'plugins/platforms')
         self.outLibDir = self.deploymentDir
-        self.outPluginDir = os.path.join(self.deploymentDir, 'platforms')
+        self.outPluginDir = self.deploymentDir
+        self.outPlatformsDir = os.path.join(self.deploymentDir, 'platforms')
         self.outQmlDir = os.path.join(self.deploymentDir, 'qml')
         
         f = open(self.descriptionFile)
