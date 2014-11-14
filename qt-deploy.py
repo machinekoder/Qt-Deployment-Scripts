@@ -239,6 +239,19 @@ class QtDeployment:
                         myzip.write(os.path.join(root, f))
                 myzip.close()
         elif (self.platform == 'linux_x86') or (self.platform == 'linux_x64'):
+            # create run.sh
+            runFilePath = os.path.join(self.deploymentDir, 'run.sh')
+            runFile = open(runFilePath, 'w')
+            if runFile:
+                runFile.write('#!/bin/bash\n')
+                runFile.write('LD_LIBRARY_PATH=`pwd`\n')
+                runFile.write('./machinekit-client\n')
+                runFile.close()
+                st = os.stat(runFilePath)
+                os.chmod(runFilePath, st.st_mode | stat.S_IEXEC)
+            else:
+                sys.stderr.write('error creating ' + runFilePath + '\n')
+                exit(1)
             # create tar file
             with tarfile.open(self.zipName, 'w:gz') as mytar:
                 for root, dirs, files in os.walk(self.deploymentDir):
