@@ -32,9 +32,8 @@ def copyLib(src, dstDir, version=-1):
                 copy(os.path.join(srcDir, f), os.path.join(dstDir, f))
     else:
         srcNameExtended = srcName + '.' + str(version)
-        for f in reversed(os.listdir(srcDir)):
-            if srcNameExtended in f:
-                copy(os.path.join(srcDir, f), os.path.join(dstDir, f))
+        shutil.copy(os.path.join(srcDir, srcNameExtended),
+                    os.path.join(dstDir, srcNameExtended))
         
 class QtDeployment:
     def __init__(self):
