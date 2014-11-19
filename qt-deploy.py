@@ -16,30 +16,33 @@ import argparse
 from subprocess import call
 import github3
 
+
 def copy(src, dst):
     if os.path.islink(src):
         linkto = os.readlink(src)
         os.symlink(linkto, dst)
     else:
-        shutil.copy(src,dst)
-        
-def copyLib(src, dstDir, version=-1):
+        shutil.copy(src, dst)
+
+
+def copyLib(src, dstDir, version=''):
     srcDir = os.path.dirname(src)
     srcName = os.path.basename(src)
-    if version == -1:
+    if version == '':
         for f in reversed(os.listdir(srcDir)):
             if srcName in f:
                 copy(os.path.join(srcDir, f), os.path.join(dstDir, f))
     else:
-        srcNameExtended = srcName + '.' + str(version)
+        srcNameExtended = srcName + '.' + version
         shutil.copy(os.path.join(srcDir, srcNameExtended),
                     os.path.join(dstDir, srcNameExtended))
-        
+
+
 class QtDeployment:
     def __init__(self):
         self.gh = None
         self.repository = None
-        
+
     def loginToGitHub(self):
         sys.stdout.write("loging in to GitHub...")
         sys.stdout.flush()
@@ -48,19 +51,19 @@ class QtDeployment:
             sys.stdout.write("failed\n")
             exit(1)
         sys.stdout.write("done\n")
-        
+
         self.repository = self.gh.repository(owner=self.repoUser, repository=self.repoName)
         if not self.repository:
             print("Repository not found")
             exit(1)
-            
+
     def createReleaseTag(self, releaseName):
         return releaseName.lower().replace(' ', '_')
-        
+
     def updateRelease(self):
         sys.stdout.write("updating release on GitHub...")
         sys.stdout.flush()
-        
+
         releaseTag = self.createReleaseTag(self.releaseName)
         self.release = None
         for r in self.repository.releases():
@@ -84,15 +87,15 @@ class QtDeployment:
                               prerelease = self.prerelease,
                               draft = self.draft,
                               target_commitish = self.gitTag)
-        
+
         sys.stdout.write("done\n")
-                              
+
     def removeRelease(self):
         sys.stdout.write("removing release from GitHub...")
         sys.stdout.flush()
-            
+
         releaseTag = self.createReleaseTag(self.releaseName)
-        
+
         self.release = None
         for r in self.repository.iter_releases():
             if (r.tag_name == releaseTag):
@@ -100,20 +103,20 @@ class QtDeployment:
                 if self.debug:
                     print("release exists")
                 break
-        
+
         if self.release:
             self.release.delete()
             self.release = None
-            
+
         sys.stdout.write("done\n")
-            
+
     def updateAsset(self):
         sys.stdout.write("uploading file to GitHub...")
         sys.stdout.flush()
-            
+
         if not self.release:
             raise Exception("You must first create a release")
-        
+
         assetName = os.path.basename(self.zipName)
         assetType = mimetypes.guess_type(self.zipName)
         assetFile = open(self.zipName, 'r')
@@ -121,9 +124,9 @@ class QtDeployment:
         asset = None
         if assetFile:
             try:
-                asset = self.release.upload_asset(content_type = assetType,
-                                            name = assetName,
-                                            asset = assetFile)
+                asset = self.release.upload_asset(content_type=assetType,
+                                            name=assetName,
+                                            asset=assetFile)
             except:
                 pass
             assetFile.close()
@@ -131,9 +134,9 @@ class QtDeployment:
         if not asset:
             sys.stderr.write("uploading file failed\n")
             exit(1)
-            
+
         sys.stdout.write("done\n")
-            
+
     def cleanup(self):
         sys.stdout.write("startin cleanup...")
         sys.stdout.flush()
@@ -145,7 +148,7 @@ class QtDeployment:
             os.remove(self.zipName)
 
         sys.stdout.write("done\n")
-            
+
     def deployMac(self):
         self.cleanup()
 
@@ -170,56 +173,65 @@ class QtDeployment:
 
     def deployFiles(self):
         self.cleanup()
-        
+
         sys.stdout.write("copying files...")
         sys.stdout.flush()
         try:
             os.makedirs(self.outLibDir)
         except WindowsError:    # ignore error on windows
             pass
-        
+
         for lib in self.qtLibs:
             # if version os specified copy only libs with this version
             version = -1
             libSplit = lib.split(':')
             lib = libSplit[0]
             if len(libSplit) > 1:
-                version = int(libSplit[1])
-                
+                version = libSplit[1]
+
             libName = self.libraryPrefix + lib + self.libraryExtension
             inPath = os.path.join(self.qtLibDir, libName)
-            copyLib(inPath, self.outLibDir)
-            
+            copyLib(inPath, self.outLibDir, version)
+
         for lib in self.libs:
             # if version os specified copy only libs with this version
-            version = -1
+            version = ''
             libSplit = lib.split(':')
             lib = libSplit[0]
             if len(libSplit) > 1:
-                version = int(libSplit[1])
-                
+                version = libSplit[1]
+
             libName = lib + self.libraryExtension
-            inPath = os.path.join(self.libDir, libName)
-            copyLib(inPath, self.outLibDir, version)
-        
+            copied = False
+            for libDir in self.libDirs:
+                inPath = os.path.join(libDir, libName)
+                if os.path.isfile(inPath):
+                    copyLib(inPath, self.outLibDir, version)
+                    copied = True
+                    break
+
+            if not copied:
+                sys.stderr.write('could not find library ' + libName + '\n')
+                exit(1)
+
         try:
             os.makedirs(self.outPlatformsDir)
         except WindowsError:    # ignore error on windows
             pass
-        
+
         for plugin in self.platformPlugins:
             pluginName = self.libraryPrefix + plugin + self.libraryExtension
             inPath = os.path.join(self.platformsDir, pluginName)
             outPath = os.path.join(self.outPlatformsDir, pluginName)
             shutil.copyfile(inPath, outPath)
-        
+
         inFile = os.path.join(self.applicationDir, self.target)
         targetFile = os.path.join(self.deploymentDir, self.target)
         shutil.copyfile(inFile, targetFile)
         if (self.platform == 'linux_x86') or (self.platform == 'linux_x64'):
             st = os.stat(targetFile)
             os.chmod(targetFile, st.st_mode | stat.S_IEXEC)
-        
+
         if self.qmlPlugins[0] != '':
             for qmlplugin in self.qmlPlugins:
                 targetPath = os.path.join(self.outQmlDir, qmlplugin)
@@ -233,15 +245,15 @@ class QtDeployment:
                 if os.path.exists(targetPath):
                     shutil.rmtree(targetPath)
                 shutil.copytree(os.path.join(self.pluginDir, qtplugin), targetPath)
-            
+
         # remove unnecessary files:
         for root, dirs, files in os.walk(self.outQmlDir):
                 for f in files:
                     if (f == 'plugins.qmltypes'):
                         os.remove(os.path.join(root, f))
-                            
+
         sys.stdout.write("done\n")
-            
+
         sys.stdout.write("compressing files...")
         sys.stdout.flush()
         if (self.platform == 'windows_x86') or (self.platform == 'windows_x64'):
@@ -284,11 +296,11 @@ class QtDeployment:
                         mytar.add(os.path.join(root, f))
                 mytar.close()
         sys.stdout.write("done\n")
-            
+
     def parseConfig(self):
         if self.debug:
             print("parsing config file")
-            
+
         if self.version:
             defaults = {'version': self.version}
         else:
@@ -308,7 +320,10 @@ class QtDeployment:
             self.qmlSourceDir = os.path.expanduser(config.get('Deployment', 'qmlSourceDir').strip('"'))
         else:
             self.deploymentDir = os.path.expanduser(config.get('Deployment', 'deploymentDir').strip('"'))
-            self.libDir = os.path.expanduser(config.get('Deployment', 'libDir').strip('"'))
+            rawLibDirs = config.get('Deployment', 'libDir').strip('"').split(',')
+            self.libDirs = []
+            for libDir in rawLibDirs:
+                self.libDirs.append(os.path.expanduser(libDir))
             self.qmlPlugins = config.get('Deployment', 'qmlPlugins').strip('"').split(',')
             self.qtPlugins = config.get('Deployment', 'qtPlugins').strip('"').split(',')
             self.platformPlugins = config.get('Deployment','platformPlugins').strip('"').split(',')
@@ -327,7 +342,7 @@ class QtDeployment:
         [self.repoUser, self.repoName] = config.get('GitHub', 'repo').strip('"').split('/')
         self.releaseName = config.get('Release', 'name').strip('"')
         self.descriptionFile = config.get('Release', 'description').strip('"')
-        
+
     def parseArguments(self):
         parser = argparse.ArgumentParser(description='Component for easy deployment of Qt applications')
         parser.add_argument('-v', '--version', help='Version of the application', required=None)
@@ -356,18 +371,18 @@ class QtDeployment:
         self.clean = args.clean
         self.configFile = args.config
         self.gitTag = args.tag
-        
+
         if self.debug:
             print("parsed arguments")
-        
+
         if not self.configFile:
             print("no config file specified")
             exit(1)
-        
+
     def createVars(self):
         if self.debug:
             print("creating variables")
-            
+
         zipNameBase = self.name + '-' + self.version + '_' + self.platform
         if (self.platform == 'windows_x86') or (self.platform == 'windows_x64'):
             self.targetExtension = '.exe'
@@ -391,7 +406,7 @@ class QtDeployment:
             self.targetExtension = ''
             self.libraryExtension = ''
             self.qtDir = os.path.join(self.qtDir, 'lib')
-        
+
         self.target = self.name + self.targetExtension
         self.qmlDir = os.path.join(self.qtDir, 'qml')
         self.pluginDir = os.path.join(self.qtDir, 'plugins')
@@ -400,17 +415,17 @@ class QtDeployment:
         self.outPluginDir = self.deploymentDir
         self.outPlatformsDir = os.path.join(self.deploymentDir, 'platforms')
         self.outQmlDir = os.path.join(self.deploymentDir, 'qml')
-        
+
         f = open(self.descriptionFile)
         if f:
             self.releaseDescription = f.read()
-            
+
     def checkCredentials(self):
         if not self.userName:
             self.userName = raw_input('GitHub username: ')
         if not self.userPassword:
             self.userPassword = getpass.getpass('GitHub password: ')
-        
+
     def run(self):
         self.parseArguments()
         self.parseConfig()
