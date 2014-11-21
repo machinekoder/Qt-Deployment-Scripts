@@ -183,7 +183,7 @@ class QtDeployment:
 
         for lib in self.qtLibs:
             # if version os specified copy only libs with this version
-            version = -1
+            version = ''
             libSplit = lib.split(':')
             lib = libSplit[0]
             if len(libSplit) > 1:
