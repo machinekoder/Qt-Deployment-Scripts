@@ -181,38 +181,40 @@ class QtDeployment:
         except WindowsError:    # ignore error on windows
             pass
 
-        for lib in self.qtLibs:
-            # if version os specified copy only libs with this version
-            version = ''
-            libSplit = lib.split(':')
-            lib = libSplit[0]
-            if len(libSplit) > 1:
-                version = libSplit[1]
+        if self.qtLibs[0] != '':
+            for lib in self.qtLibs:
+                # if version os specified copy only libs with this version
+                version = ''
+                libSplit = lib.split(':')
+                lib = libSplit[0]
+                if len(libSplit) > 1:
+                    version = libSplit[1]
 
-            libName = self.libraryPrefix + lib + self.libraryExtension
-            inPath = os.path.join(self.qtLibDir, libName)
-            copyLib(inPath, self.outLibDir, version)
+                libName = self.libraryPrefix + lib + self.libraryExtension
+                inPath = os.path.join(self.qtLibDir, libName)
+                copyLib(inPath, self.outLibDir, version)
 
-        for lib in self.libs:
-            # if version os specified copy only libs with this version
-            version = ''
-            libSplit = lib.split(':')
-            lib = libSplit[0]
-            if len(libSplit) > 1:
-                version = libSplit[1]
+        if self.libs[0] != '':
+            for lib in self.libs:
+                # if version os specified copy only libs with this version
+                version = ''
+                libSplit = lib.split(':')
+                lib = libSplit[0]
+                if len(libSplit) > 1:
+                    version = libSplit[1]
 
-            libName = lib + self.libraryExtension
-            copied = False
-            for libDir in self.libDirs:
-                inPath = os.path.join(libDir, libName)
-                if os.path.isfile(inPath):
-                    copyLib(inPath, self.outLibDir, version)
-                    copied = True
-                    break
+                libName = lib + self.libraryExtension
+                copied = False
+                for libDir in self.libDirs:
+                    inPath = os.path.join(libDir, libName)
+                    if os.path.isfile(inPath):
+                        copyLib(inPath, self.outLibDir, version)
+                        copied = True
+                        break
 
-            if not copied:
-                sys.stderr.write('could not find library ' + libName + '\n')
-                exit(1)
+                if not copied:
+                    sys.stderr.write('could not find library ' + libName + '\n')
+                    exit(1)
 
         try:
             os.makedirs(self.outPlatformsDir)
@@ -282,7 +284,15 @@ class QtDeployment:
             if runFile:
                 runFile.write('#!/bin/bash\n')
                 runFile.write('export LD_LIBRARY_PATH=`pwd`\n')
-                runFile.write('./machinekit-client\n')
+                runFile.write('export QML_IMPORT_PATH=`pwd`/qml\n')
+                runFile.write('export QML2_IMPORT_PATH=`pwd`/qml\n')
+                runFile.write('export QT_QPA_PLATFORM_PLUGIN_PATH=`pwd`/platforms\n')
+                runFile.write('export QT_PLUGIN_PATH=`pwd`\n')
+                if (self.platform == 'linux_x86'):
+                    runFile.write('/lib/ld-linux.so.2 ')
+                else:
+                    runFile.write('/lib64/ld-linux-x86-64.so.2 ')
+                runFile.write('`pwd`/' + self.target + '\n')
                 runFile.close()
                 st = os.stat(runFilePath)
                 os.chmod(runFilePath, st.st_mode | stat.S_IEXEC)
@@ -407,7 +417,7 @@ class QtDeployment:
             self.libraryExtension = ''
             self.qtDir = os.path.join(self.qtDir, 'lib')
 
-        self.target = self.name + self.targetExtension
+        self.target = self.name.lower() + self.targetExtension
         self.qmlDir = os.path.join(self.qtDir, 'qml')
         self.pluginDir = os.path.join(self.qtDir, 'plugins')
         self.platformsDir = os.path.join(self.qtDir, 'plugins/platforms')
