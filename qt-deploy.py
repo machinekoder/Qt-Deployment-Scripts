@@ -283,6 +283,11 @@ class QtDeployment:
             runFile = open(runFilePath, 'w')
             if runFile:
                 runFile.write('#!/bin/bash\n')
+                runFile.write('if [ -z "$BASH_SOURCE" ]; then\n')
+                runFile.write('cd "$(dirname "$(readlink -f "$0")")"\n')
+                runFile.write('else\n')
+                runFile.write('cd "$(dirname "${BASH_SOURCE[0]}" )"\n')
+                runFile.write('fi\n')
                 runFile.write('export LD_LIBRARY_PATH=`pwd`\n')
                 runFile.write('export QML_IMPORT_PATH=`pwd`/qml\n')
                 runFile.write('export QML2_IMPORT_PATH=`pwd`/qml\n')
