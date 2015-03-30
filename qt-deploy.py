@@ -29,9 +29,14 @@ def copyLib(src, dstDir, version=''):
     srcDir = os.path.dirname(src)
     srcName = os.path.basename(src)
     if version == '':
+        found = False
         for f in reversed(os.listdir(srcDir)):
             if srcName in f:
                 copy(os.path.join(srcDir, f), os.path.join(dstDir, f))
+                found = True
+        if not found:
+            sys.stdout.write("library " + srcName + " not found\n")
+            exit(1)
     else:
         srcNameExtended = srcName + '.' + version
         shutil.copy(os.path.join(srcDir, srcNameExtended),
@@ -227,8 +232,13 @@ class QtDeployment:
             outPath = os.path.join(self.outPlatformsDir, pluginName)
             shutil.copyfile(inPath, outPath)
 
+        try:
+            os.makedirs(self.outBinDir)
+        except WindowsError:    # ignore error on windows
+            pass
+
         inFile = os.path.join(self.applicationDir, self.target)
-        targetFile = os.path.join(self.deploymentDir, self.target)
+        targetFile = os.path.join(self.outBinDir, self.target)
         shutil.copyfile(inFile, targetFile)
         if (self.platform == 'linux_x86') or (self.platform == 'linux_x64'):
             st = os.stat(targetFile)
@@ -273,13 +283,14 @@ class QtDeployment:
                 myzip.close()
         elif (self.platform == 'linux_x86') or (self.platform == 'linux_x64'):
             # strip debug information
-            for root, dirs, files in os.walk(self.deploymentDir):
+            for root, dirs, files in os.walk(self.outLibDir):
                     for f in files:
-                        if ((self.libraryExtension) in f) \
-                            or (f == self.target):
+                        if self.libraryExtension in f:
                             call(['strip', os.path.join(root, f)])
+            call(['strip', os.path.join(self.outBinDir, self.target)])
+
             # create run.sh
-            runFilePath = os.path.join(self.deploymentDir, 'run.sh')
+            runFilePath = os.path.join(self.deploymentDir, self.target)
             runFile = open(runFilePath, 'w')
             if runFile:
                 runFile.write('#!/bin/bash\n')
@@ -288,7 +299,7 @@ class QtDeployment:
                 runFile.write('else\n')
                 runFile.write('cd "$(dirname "${BASH_SOURCE[0]}" )"\n')
                 runFile.write('fi\n')
-                runFile.write('export LD_LIBRARY_PATH=`pwd`\n')
+                runFile.write('export LD_LIBRARY_PATH=`pwd`/lib\n')
                 runFile.write('export QML_IMPORT_PATH=`pwd`/qml\n')
                 runFile.write('export QML2_IMPORT_PATH=`pwd`/qml\n')
                 runFile.write('export QT_QPA_PLATFORM_PLUGIN_PATH=`pwd`/platforms\n')
@@ -297,7 +308,7 @@ class QtDeployment:
                     runFile.write('/lib/ld-linux.so.2 ')
                 else:
                     runFile.write('/lib64/ld-linux-x86-64.so.2 ')
-                runFile.write('`pwd`/' + self.target + '\n')
+                runFile.write('`pwd`/bin/' + self.target + '\n')
                 runFile.close()
                 st = os.stat(runFilePath)
                 os.chmod(runFilePath, st.st_mode | stat.S_IEXEC)
@@ -405,12 +416,16 @@ class QtDeployment:
             self.libraryPrefix = ''
             self.zipName = zipNameBase + '.zip'
             self.qtLibDir = os.path.join(self.qtDir, 'bin')
+            self.outLibDir = self.deploymentDir
+            self.outBinDir = self.deploymentDir
         elif (self.platform == 'linux_x86') or (self.platform == 'linux_x64'):
             self.targetExtension = ''
             self.libraryExtension = '.so'
             self.libraryPrefix = 'lib'
             self.zipName = zipNameBase + '.tar.gz'
             self.qtLibDir = os.path.join(self.qtDir, 'lib')
+            self.outLibDir = os.path.join(self.deploymentDir, 'lib')
+            self.outBinDir = os.path.join(self.deploymentDir, 'bin')
         elif (self.platform == 'mac'):
             self.targetExtension = '.app'
             self.qtBinDir = os.path.join(self.qtDir, 'bin')
@@ -426,14 +441,15 @@ class QtDeployment:
         self.qmlDir = os.path.join(self.qtDir, 'qml')
         self.pluginDir = os.path.join(self.qtDir, 'plugins')
         self.platformsDir = os.path.join(self.qtDir, 'plugins/platforms')
-        self.outLibDir = self.deploymentDir
         self.outPluginDir = self.deploymentDir
         self.outPlatformsDir = os.path.join(self.deploymentDir, 'platforms')
         self.outQmlDir = os.path.join(self.deploymentDir, 'qml')
 
-        f = open(self.descriptionFile)
-        if f:
-            self.releaseDescription = f.read()
+        self.releaseDescription = ''
+        if os.path.exists(self.descriptionFile):
+            f = open(self.descriptionFile)
+            if f:
+                self.releaseDescription = f.read()
 
     def checkCredentials(self):
         if not self.userName:
