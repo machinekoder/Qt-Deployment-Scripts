@@ -3,6 +3,11 @@ Qt-Deployment-Scripts
 
 Python scripts for deploying Qt applications to GitHub. This blog entry [Deploying Qt](http://www.tripleboot.org/?p=138) will help you specifying the correct dependencies.
 
+# Install
+To install the deployment scripts in Linux run
+
+    sudo make install
+
 # qt-deploy.py
 This script can be used to deploy compiles Qt applications directly to GitHub. Example configurations can be found in the *examples* folder.
 
