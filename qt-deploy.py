@@ -213,7 +213,16 @@ class QtDeployment:
                 copied = False
                 for libDir in self.libDirs:
                     inPath = os.path.join(libDir, libName)
-                    if os.path.isfile(inPath):
+                    found = False
+                    if version == '':
+                        for f in reversed(os.listdir(libDir)):
+                            if libName in f:
+                                found = True
+                                break
+                    else:
+                        if os.path.isfile(inPath):
+                            found = True
+                    if found:
                         copyLib(inPath, self.outLibDir, version)
                         copied = True
                         break
@@ -343,6 +352,7 @@ class QtDeployment:
         self.platform = config.get('Deployment', 'platform').strip('"')
         self.qtDir = os.path.expanduser(config.get('Deployment', 'qtDir').strip('"'))
         self.applicationDir = os.path.expanduser(config.get('Deployment', 'applicationDir').strip('"'))
+        self.pkgName = os.path.expanduser(config.get('Deployment', 'pkgName').strip('"'))
         if self.platform == "mac":
             self.qmlSourceDir = os.path.expanduser(config.get('Deployment', 'qmlSourceDir').strip('"'))
         else:
@@ -410,12 +420,11 @@ class QtDeployment:
         if self.debug:
             print("creating variables")
 
-        zipNameBase = self.name + '-' + self.version + '_' + self.platform
         if (self.platform == 'windows_x86') or (self.platform == 'windows_x64'):
             self.targetExtension = '.exe'
             self.libraryExtension = '.dll'
             self.libraryPrefix = ''
-            self.zipName = zipNameBase + '.zip'
+            self.zipName = self.pkgName + '.zip'
             self.qtLibDir = os.path.join(self.qtDir, 'bin')
             self.outLibDir = self.deploymentDir
             self.outBinDir = self.deploymentDir
@@ -423,14 +432,14 @@ class QtDeployment:
             self.targetExtension = ''
             self.libraryExtension = '.so'
             self.libraryPrefix = 'lib'
-            self.zipName = zipNameBase + '.tar.gz'
+            self.zipName = self.pkgName + '.tar.gz'
             self.qtLibDir = os.path.join(self.qtDir, 'lib')
             self.outLibDir = os.path.join(self.deploymentDir, 'lib')
             self.outBinDir = os.path.join(self.deploymentDir, 'bin')
         elif (self.platform == 'mac'):
             self.targetExtension = '.app'
             self.qtBinDir = os.path.join(self.qtDir, 'bin')
-            self.zipName = zipNameBase + '.dmg'
+            self.zipName = self.pkgName + '.dmg'
             self.dmgName = self.name + '.dmg'
             self.deploymentDir = ''
         else:
