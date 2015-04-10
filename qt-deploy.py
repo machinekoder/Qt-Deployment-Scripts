@@ -1,13 +1,12 @@
 #!/usr/bin/python
 '''
-Documentation, License etc.
+Part of the Qt-Deployment scripts
 
-@package github3_test
+@package qt-deploy
 '''
 import os
 import sys
 import stat
-import mimetypes
 import shutil
 import zipfile
 import tarfile
@@ -15,7 +14,6 @@ import getpass
 import ConfigParser
 import argparse
 from subprocess import call
-import github3
 
 
 def copy(src, dst):
@@ -45,106 +43,9 @@ def copyLib(src, dstDir, version=''):
 
 
 class QtDeployment:
-    def __init__(self):
-        self.gh = None
-        self.repository = None
-
-    def loginToGitHub(self):
-        sys.stdout.write("loging in to GitHub...")
-        sys.stdout.flush()
-        self.gh = github3.login(self.userName, password=self.userPassword)
-        if not self.gh:
-            sys.stdout.write("failed\n")
-            exit(1)
-        sys.stdout.write("done\n")
-
-        self.repository = self.gh.repository(owner=self.repoUser, repository=self.repoName)
-        if not self.repository:
-            print("Repository not found")
-            exit(1)
-
-    def createReleaseTag(self, releaseName):
-        return releaseName.lower().replace(' ', '_')
-
-    def updateRelease(self):
-        sys.stdout.write("updating release on GitHub...")
-        sys.stdout.flush()
-
-        releaseTag = self.createReleaseTag(self.releaseName)
-        self.release = None
-        for r in self.repository.releases():
-            if (r.tag_name == releaseTag):
-                self.release = r
-                if self.debug:
-                    print("release exists")
-                break
-
-        if not self.release:
-            self.release = self.repository.create_release(tag_name = releaseTag,
-                                                          name = self.releaseName,
-                                                          body = self.releaseDescription,
-                                                          prerelease = self.prerelease,
-                                                          draft = self.draft,
-                                                          target_commitish = self.gitTag)
-        else:
-            self.release.edit(tag_name = releaseTag,
-                              name = self.releaseName,
-                              body = self.releaseDescription,
-                              prerelease = self.prerelease,
-                              draft = self.draft,
-                              target_commitish = self.gitTag)
-
-        sys.stdout.write("done\n")
-
-    def removeRelease(self):
-        sys.stdout.write("removing release from GitHub...")
-        sys.stdout.flush()
-
-        releaseTag = self.createReleaseTag(self.releaseName)
-
-        self.release = None
-        for r in self.repository.iter_releases():
-            if (r.tag_name == releaseTag):
-                self.release = r
-                if self.debug:
-                    print("release exists")
-                break
-
-        if self.release:
-            self.release.delete()
-            self.release = None
-
-        sys.stdout.write("done\n")
-
-    def updateAsset(self):
-        sys.stdout.write("uploading file to GitHub...")
-        sys.stdout.flush()
-
-        if not self.release:
-            raise Exception("You must first create a release")
-
-        assetName = os.path.basename(self.zipName)
-        assetType = mimetypes.guess_type(self.zipName)
-        assetFile = open(self.zipName, 'r')
-
-        asset = None
-        if assetFile:
-            try:
-                asset = self.release.upload_asset(content_type=assetType,
-                                            name=assetName,
-                                            asset=assetFile)
-            except:
-                pass
-            assetFile.close()
-
-        if not asset:
-            sys.stderr.write("uploading file failed\n")
-            exit(1)
-
-        sys.stdout.write("done\n")
 
     def cleanup(self):
-        sys.stdout.write("startin cleanup...")
+        sys.stdout.write("starting cleanup...")
         sys.stdout.flush()
 
         if os.path.exists(self.deploymentDir):
@@ -366,48 +267,21 @@ class QtDeployment:
             self.platformPlugins = config.get('Deployment','platformPlugins').strip('"').split(',')
             self.qtLibs = config.get('Deployment', 'qtLibs').strip('"').split(',')
             self.libs = config.get('Deployment', 'libs').strip('"').split(',')
-        try:
-            if not self.userName:
-                self.userName = config.get('GitHub', 'user').strip('"')
-        except:
-            self.userName = None
-        try:
-            if not self.userPassword:
-                self.userPassword = config.get('GitHub', 'password').strip('"')
-        except:
-            self.userPassword = None
-        [self.repoUser, self.repoName] = config.get('GitHub', 'repo').strip('"').split('/')
-        self.releaseName = config.get('Release', 'name').strip('"')
-        self.descriptionFile = config.get('Release', 'description').strip('"')
 
     def parseArguments(self):
         parser = argparse.ArgumentParser(description='Component for easy deployment of Qt applications')
         parser.add_argument('-v', '--version', help='Version of the application', required=None)
-        parser.add_argument('-u', '--user', help='GitHub user name', default=None)
-        parser.add_argument('-p', '--password', help='GitHub password', default=None)
-        parser.add_argument('-dr', '--draft', help='Publish on GitHub as draft', action='store_true')
-        parser.add_argument('-pr', '--prerelease', help='Publish on GitHub as pre-release', action='store_true')
-        parser.add_argument('-t', '--tag', help='Git tag of the release', default=None)
         parser.add_argument('--deploy', help='Deploy the application to the output directory', action='store_true')
-        parser.add_argument('--publish', help='Upload the application to GitHub', action='store_true')
-        parser.add_argument('--unpublish', help='Remove the release from GitHub', action='store_true')
         parser.add_argument('--clean', help='Cleanup the created files afterwards', action='store_true')
         parser.add_argument('-d', '--debug', help='Whether debug output should be enabled or not', action='store_true')
         parser.add_argument('config', help='Config file', nargs='?', default=None)
         args = parser.parse_args()
 
         self.version = args.version
-        self.userName = args.user
-        self.userPassword = args.password
-        self.draft = args.draft
-        self.prerelease = args.prerelease
         self.debug = args.debug
         self.deploy = args.deploy
-        self.publish = args.publish
-        self.unpublish = args.unpublish
         self.clean = args.clean
         self.configFile = args.config
-        self.gitTag = args.tag
 
         if self.debug:
             print("parsed arguments")
@@ -455,18 +329,6 @@ class QtDeployment:
         self.outPlatformsDir = os.path.join(self.deploymentDir, 'platforms')
         self.outQmlDir = os.path.join(self.deploymentDir, 'qml')
 
-        self.releaseDescription = ''
-        if os.path.exists(self.descriptionFile):
-            f = open(self.descriptionFile)
-            if f:
-                self.releaseDescription = f.read()
-
-    def checkCredentials(self):
-        if not self.userName:
-            self.userName = raw_input('GitHub username: ')
-        if not self.userPassword:
-            self.userPassword = getpass.getpass('GitHub password: ')
-
     def run(self):
         self.parseArguments()
         self.parseConfig()
@@ -476,15 +338,6 @@ class QtDeployment:
                 self.deployMac()
             else:
                 self.deployFiles()
-        if self.publish:
-            self.checkCredentials()
-            self.loginToGitHub()
-            self.updateRelease()
-            self.updateAsset()
-        if self.unpublish:
-            self.checkCredentials()
-            self.loginToGitHub()
-            self.removeRelease()
         if self.clean:
             self.cleanup()
 
