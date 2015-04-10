@@ -176,7 +176,7 @@ class QtRelease:
                                                           name=self.releaseName,
                                                           body=self.releaseDescription,
                                                           draft=self.draft,
-                                                          prereleae=self.prerelease)
+                                                          prerelease=self.prerelease)
             printInfo('done\n')
 
     def deleteAssets(self):
