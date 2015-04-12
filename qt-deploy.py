@@ -13,7 +13,7 @@ import tarfile
 import getpass
 import ConfigParser
 import argparse
-from subprocess import call
+from subprocess import check_call
 
 
 def copy(src, dst):
@@ -62,19 +62,21 @@ class QtDeployment:
         sys.stdout.write("creating disk image...")
         sys.stdout.flush()
         macutil = os.path.join(self.qtBinDir, 'macdeployqt')
-        targetBundle = os.path.join(self.applicationDir, self.target)
-        call([macutil, targetBundle, '-qmldir=' + self.qmlSourceDir, '-dmg'])
+        currentDir = os.getcwd()
+        os.chdir(self.applicationDir)
+        check_call(macutil + ' ' + self.target + ' -qmldir=' + os.path.abspath(self.qmlSourceDir) + ' -dmg', shell=True)
+        os.chdir(currentDir)
         sys.stdout.write("done\n")
 
         sys.stdout.write("moving disk image...")
         sys.stdout.flush()
         inPath = os.path.join(self.applicationDir, self.dmgName)
-        shutil.copyfile(inPath, self.zipName)
-        os.remove(inPath)
+        shutil.move(inPath, self.zipName)
         sys.stdout.write("done\n")
 
         sys.stdout.write("cleaning app bundle...")
         sys.stdout.flush()
+        targetBundle = os.path.join(self.applicationDir, self.target)
         shutil.rmtree(targetBundle)
         sys.stdout.write("done\n")
 
@@ -197,8 +199,8 @@ class QtDeployment:
             for root, dirs, files in os.walk(self.outLibDir):
                     for f in files:
                         if self.libraryExtension in f:
-                            call(['strip', os.path.join(root, f)])
-            call(['strip', os.path.join(self.outBinDir, self.target)])
+                            check_call(['strip', os.path.join(root, f)])
+            check_call(['strip', os.path.join(self.outBinDir, self.target)])
 
             # create run.sh
             runFilePath = os.path.join(self.deploymentDir, self.target)
