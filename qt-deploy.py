@@ -115,6 +115,8 @@ class QtDeployment:
                 libName = lib + self.libraryExtension
                 copied = False
                 for libDir in self.libDirs:
+                    if not os.path.exists(libDir):
+                        continue
                     inPath = os.path.join(libDir, libName)
                     found = False
                     if version == '':
