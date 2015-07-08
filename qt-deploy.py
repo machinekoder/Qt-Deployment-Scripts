@@ -13,6 +13,7 @@ import tarfile
 import getpass
 import ConfigParser
 import argparse
+import subprocess
 from subprocess import check_call
 
 
@@ -78,6 +79,47 @@ class QtDeployment:
         sys.stdout.flush()
         targetBundle = os.path.join(self.applicationDir, self.target)
         shutil.rmtree(targetBundle)
+        sys.stdout.write("done\n")
+
+    def deployAndroid(self):
+        self.cleanup()
+
+        # read storepass from cmd
+        sys.stdout.write("reading storepass...")
+        proc = subprocess.Popen(self.androidStorepassCmd,
+                                stdout=subprocess.PIPE, shell=True)
+        storepass = proc.stdout.read().strip()
+        sys.stdout.write("done\n")
+
+        # read keypass from cmd
+        sys.stdout.write("reading keypass...")
+        proc = subprocess.Popen(self.androidKeypassCmd,
+                                stdout=subprocess.PIPE, shell=True)
+        keypass = proc.stdout.read().strip()
+        sys.stdout.write("done\n")
+
+        sys.stdout.write("creating Android package...")
+        sys.stdout.flush()
+        androidutil = os.path.join(self.qtBinDir, 'androiddeployqt')
+        currentDir = os.getcwd()
+        os.chdir(self.applicationDir)
+        buildSettings = './android-lib%s.so-deployment-settings.json' % self.name
+        deployCmd = androidutil
+        deployCmd += ' --input %s' % buildSettings
+        deployCmd += ' --output %s' % self.androidBuildDir
+        deployCmd += ' --deployment bundled'
+        deployCmd += ' --android-platform %s' % self.androidPlatform
+        deployCmd += ' --sign %s %s' % (self.androidKeystore, self.androidKey)
+        deployCmd += ' --storepass %s' % storepass
+        deployCmd += ' --keypass %s' % keypass
+        check_call(deployCmd, shell=True)
+        os.chdir(currentDir)
+        sys.stdout.write("done\n")
+
+        sys.stdout.write("moving Android package...")
+        sys.stdout.flush()
+        inPath = os.path.join(self.androidBuildDir, 'bin', self.apkName)
+        shutil.move(inPath, self.zipName)
         sys.stdout.write("done\n")
 
     def deployFiles(self):
@@ -260,6 +302,12 @@ class QtDeployment:
         self.pkgName = os.path.expanduser(config.get('Deployment', 'pkgName').strip('"'))
         if self.platform == "mac":
             self.qmlSourceDir = os.path.expanduser(config.get('Deployment', 'qmlSourceDir').strip('"'))
+        elif "android" in self.platform:
+            self.androidPlatform = config.get('Deployment', 'androidPlatform').strip('"')
+            self.androidKeystore = os.path.expanduser(config.get('Deployment', 'androidKeystore').strip('"'))
+            self.androidKey = config.get('Deployment', 'androidKey').strip('"')
+            self.androidStorepassCmd = os.path.expanduser(config.get('Deployment', 'androidStorepassCmd').strip('"'))
+            self.androidKeypassCmd = os.path.expanduser(config.get('Deployment', 'androidKeypassCmd').strip('"'))
         else:
             self.deploymentDir = os.path.expanduser(config.get('Deployment', 'deploymentDir').strip('"'))
             rawLibDirs = config.get('Deployment', 'libDir').strip('"').split(',')
@@ -320,6 +368,13 @@ class QtDeployment:
             self.zipName = self.pkgName + '.dmg'
             self.dmgName = self.name + '.dmg'
             self.deploymentDir = ''
+        elif 'android' in self.platform:
+            self.targetExtension = '.apk'
+            self.qtBinDir = os.path.join(self.qtDir, 'bin')
+            self.zipName = self.pkgName + '.apk'
+            self.androidBuildDir = os.path.join(self.applicationDir, 'android-build')
+            self.apkName = 'QtApp-release-signed.apk'
+            self.deploymentDir = ''
         else:
             self.targetExtension = ''
             self.libraryExtension = ''
@@ -340,6 +395,8 @@ class QtDeployment:
         if self.deploy:
             if self.platform == 'mac':
                 self.deployMac()
+            elif 'android' in self.platform:
+                self.deployAndroid()
             else:
                 self.deployFiles()
         if self.clean:
