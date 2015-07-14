@@ -10,7 +10,6 @@ import stat
 import shutil
 import zipfile
 import tarfile
-import getpass
 import ConfigParser
 import argparse
 import subprocess
