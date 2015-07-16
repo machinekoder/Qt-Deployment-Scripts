@@ -80,6 +80,55 @@ class QtDeployment:
         shutil.rmtree(targetBundle)
         sys.stdout.write("done\n")
 
+    def deployWindows(self):
+        self.cleanup()
+
+        # create deployment dir
+        try:
+            os.makedirs(self.deploymentDir)
+        except WindowsError:    # ignore error on windows
+            pass
+
+        # copy dependencies using windeployqt
+        sys.stdout.write("copying dependencies...")
+        sys.stdout.flush()
+        currentDir = os.getcwd()
+        os.chdir(self.applicationDir)
+        winutil = os.path.join(self.qtBinDir, 'windeployqt.exe')
+        cmd = '%s %s' % (winutil, self.target)
+        cmd += ' --qmldir %s' % os.path.abspath(self.qmlSourceDir)
+        cmd += ' --dir %s' % os.path.abspath(self.deploymentDir)
+        check_call(cmd, shell=True)
+        os.chdir(currentDir)
+        sys.stdout.write("done\n")
+
+        # copy additional libraries
+        if self.libs[0] != '':
+            # create the lib dir in case it does not exists
+            sys.stdout.write("copying additional libraries...")
+            sys.stdout.flush()
+            try:
+                os.makedirs(self.outLibDir)
+            except WindowsError:    # ignore error on windows
+                pass
+
+            for lib in self.libs:
+                libName = self.libraryPrefix + lib + self.libraryExtension
+                inPath = os.path.join(self.libDir, libName)
+                copyLib(inPath, self.outLibDir)
+
+            sys.stdout.write("done\n")
+
+        sys.stdout.write("compressing files...")
+        sys.stdout.flush()
+        # create zip file
+        with zipfile.ZipFile(self.zipName, 'w', zipfile.ZIP_DEFLATED) as myzip:
+            for root, dirs, files in os.walk(self.deploymentDir):
+                for f in files:
+                    myzip.write(os.path.join(root, f))
+            myzip.close()
+        sys.stdout.write("done\n")
+
     def deployAndroid(self):
         self.cleanup()
 
@@ -121,16 +170,16 @@ class QtDeployment:
         shutil.move(inPath, self.zipName)
         sys.stdout.write("done\n")
 
-    def deployFiles(self):
+    def deployLinux(self):
         self.cleanup()
 
         sys.stdout.write("copying files...")
         sys.stdout.flush()
-        try:
-            os.makedirs(self.outLibDir)
-        except WindowsError:    # ignore error on windows
-            pass
 
+        # create lib dir
+        os.makedirs(self.outLibDir)
+
+        # copy Qt libs
         if self.qtLibs[0] != '':
             for lib in self.qtLibs:
                 # if version os specified copy only libs with this version
@@ -144,9 +193,10 @@ class QtDeployment:
                 inPath = os.path.join(self.qtLibDir, libName)
                 copyLib(inPath, self.outLibDir, version)
 
+        # copy additional libraries
         if self.libs[0] != '':
             for lib in self.libs:
-                # if version os specified copy only libs with this version
+                # if version is specified copy only libs with this version
                 version = ''
                 libSplit = lib.split(':')
                 lib = libSplit[0]
@@ -174,32 +224,30 @@ class QtDeployment:
                         break
 
                 if not copied:
-                    sys.stderr.write('could not find library ' + libName + '\n')
+                    sys.stderr.write('could not find library %s\n' % libName)
                     exit(1)
 
-        try:
-            os.makedirs(self.outPlatformsDir)
-        except WindowsError:    # ignore error on windows
-            pass
+        # create the platforms dir
+        os.makedirs(self.outPlatformsDir)
 
+        # copy Qt platform plugins
         for plugin in self.platformPlugins:
             pluginName = self.libraryPrefix + plugin + self.libraryExtension
             inPath = os.path.join(self.platformsDir, pluginName)
             outPath = os.path.join(self.outPlatformsDir, pluginName)
             shutil.copyfile(inPath, outPath)
 
-        try:
-            os.makedirs(self.outBinDir)
-        except WindowsError:    # ignore error on windows
-            pass
+        # create the bin dir
+        os.makedirs(self.outBinDir)
 
+        # copy target and make it executable
         inFile = os.path.join(self.applicationDir, self.target)
         targetFile = os.path.join(self.outBinDir, self.target)
         shutil.copyfile(inFile, targetFile)
-        if (self.platform == 'linux_x86') or (self.platform == 'linux_x64'):
-            st = os.stat(targetFile)
-            os.chmod(targetFile, st.st_mode | stat.S_IEXEC)
+        st = os.stat(targetFile)
+        os.chmod(targetFile, st.st_mode | stat.S_IEXEC)
 
+        # copy QML plugins
         if self.qmlPlugins[0] != '':
             for qmlplugin in self.qmlPlugins:
                 targetPath = os.path.join(self.outQmlDir, qmlplugin)
@@ -207,6 +255,7 @@ class QtDeployment:
                     shutil.rmtree(targetPath)
                 shutil.copytree(os.path.join(self.qmlDir, qmlplugin), targetPath)
 
+        # copy Qt plugins
         if self.qtPlugins[0] != '':
             for qtplugin in self.qtPlugins:
                 targetPath = os.path.join(self.outPluginDir, qtplugin)
@@ -224,59 +273,46 @@ class QtDeployment:
 
         sys.stdout.write("compressing files...")
         sys.stdout.flush()
-        if (self.platform == 'windows_x86') or (self.platform == 'windows_x64'):
-            # remove debug libraries
-            for root, dirs, files in os.walk(self.deploymentDir):
-                    for f in files:
-                        if (('d' + self.libraryExtension) in f)  \
-                            or (('d.pdb') in f):
-                            os.remove(os.path.join(root, f))
-            # create zip file
-            with zipfile.ZipFile(self.zipName, 'w', zipfile.ZIP_DEFLATED) as myzip:
-                for root, dirs, files in os.walk(self.deploymentDir):
-                    for f in files:
-                        myzip.write(os.path.join(root, f))
-                myzip.close()
-        elif (self.platform == 'linux_x86') or (self.platform == 'linux_x64'):
-            # strip debug information
-            for root, dirs, files in os.walk(self.outLibDir):
-                    for f in files:
-                        if self.libraryExtension in f:
-                            check_call(['strip', os.path.join(root, f)])
-            check_call(['strip', os.path.join(self.outBinDir, self.target)])
+        # strip debug information
+        for root, dirs, files in os.walk(self.outLibDir):
+            for f in files:
+                if self.libraryExtension in f:
+                    check_call(['strip', os.path.join(root, f)])
+        check_call(['strip', os.path.join(self.outBinDir, self.target)])
 
-            # create run.sh
-            runFilePath = os.path.join(self.deploymentDir, self.target)
-            runFile = open(runFilePath, 'w')
-            if runFile:
-                runFile.write('#!/bin/bash\n')
-                runFile.write('if [ -z "$BASH_SOURCE" ]; then\n')
-                runFile.write('cd "$(dirname "$(readlink -f "$0")")"\n')
-                runFile.write('else\n')
-                runFile.write('cd "$(dirname "${BASH_SOURCE[0]}" )"\n')
-                runFile.write('fi\n')
-                runFile.write('export LD_LIBRARY_PATH=`pwd`/lib\n')
-                runFile.write('export QML_IMPORT_PATH=`pwd`/qml\n')
-                runFile.write('export QML2_IMPORT_PATH=`pwd`/qml\n')
-                runFile.write('export QT_QPA_PLATFORM_PLUGIN_PATH=`pwd`/platforms\n')
-                runFile.write('export QT_PLUGIN_PATH=`pwd`\n')
-                if (self.platform == 'linux_x86'):
-                    runFile.write('/lib/ld-linux.so.2 ')
-                else:
-                    runFile.write('/lib64/ld-linux-x86-64.so.2 ')
-                runFile.write('`pwd`/bin/' + self.target + '\n')
-                runFile.close()
-                st = os.stat(runFilePath)
-                os.chmod(runFilePath, st.st_mode | stat.S_IEXEC)
+        # create run.sh
+        runFilePath = os.path.join(self.deploymentDir, self.target)
+        runFile = open(runFilePath, 'w')
+        if runFile:
+            runFile.write('#!/bin/bash\n')
+            runFile.write('if [ -z "$BASH_SOURCE" ]; then\n')
+            runFile.write('cd "$(dirname "$(readlink -f "$0")")"\n')
+            runFile.write('else\n')
+            runFile.write('cd "$(dirname "${BASH_SOURCE[0]}" )"\n')
+            runFile.write('fi\n')
+            runFile.write('CWD=`pwd`\n')
+            runFile.write('export LD_LIBRARY_PATH="$CWD"/lib\n')
+            runFile.write('export QML_IMPORT_PATH="$CWD"/qml\n')
+            runFile.write('export QML2_IMPORT_PATH="$CWD"/qml\n')
+            runFile.write('export QT_QPA_PLATFORM_PLUGIN_PATH="$CWD"/platforms\n')
+            runFile.write('export QT_PLUGIN_PATH="$CWD"\n')
+            if (self.platform == 'linux_x86'):
+                runFile.write('/lib/ld-linux.so.2 ')
             else:
-                sys.stderr.write('error creating ' + runFilePath + '\n')
-                exit(1)
-            # create tar file
-            with tarfile.open(self.zipName, 'w:gz') as mytar:
-                for root, dirs, files in os.walk(self.deploymentDir):
-                    for f in files:
-                        mytar.add(os.path.join(root, f))
-                mytar.close()
+                runFile.write('/lib64/ld-linux-x86-64.so.2 ')
+            runFile.write('"$CWD"/bin/' + self.target + '\n')
+            runFile.close()
+            st = os.stat(runFilePath)
+            os.chmod(runFilePath, st.st_mode | stat.S_IEXEC)
+        else:
+            sys.stderr.write('error creating %s\n' % runFilePath)
+            exit(1)
+        # create tar file
+        with tarfile.open(self.zipName, 'w:gz') as mytar:
+            for root, dirs, files in os.walk(self.deploymentDir):
+                for f in files:
+                    mytar.add(os.path.join(root, f))
+            mytar.close()
         sys.stdout.write("done\n")
 
     def parseConfig(self):
@@ -301,6 +337,11 @@ class QtDeployment:
         self.pkgName = os.path.expanduser(config.get('Deployment', 'pkgName').strip('"'))
         if self.platform == "mac":
             self.qmlSourceDir = os.path.expanduser(config.get('Deployment', 'qmlSourceDir').strip('"'))
+        elif "windows" in self.platform:
+            self.deploymentDir = os.path.expanduser(config.get('Deployment', 'deploymentDir').strip('"'))
+            self.qmlSourceDir = os.path.expanduser(config.get('Deployment', 'qmlSourceDir').strip('"'))
+            self.libs = config.get('Deployment', 'libs').strip('"').split(',')
+            self.libDir = os.path.expanduser(config.get('Deployment', 'libDir').strip('"'))
         elif "android" in self.platform:
             self.androidPlatform = config.get('Deployment', 'androidPlatform').strip('"')
             self.androidKeystore = os.path.expanduser(config.get('Deployment', 'androidKeystore').strip('"'))
@@ -315,7 +356,7 @@ class QtDeployment:
                 self.libDirs.append(os.path.expanduser(libDir))
             self.qmlPlugins = config.get('Deployment', 'qmlPlugins').strip('"').split(',')
             self.qtPlugins = config.get('Deployment', 'qtPlugins').strip('"').split(',')
-            self.platformPlugins = config.get('Deployment','platformPlugins').strip('"').split(',')
+            self.platformPlugins = config.get('Deployment', 'platformPlugins').strip('"').split(',')
             self.qtLibs = config.get('Deployment', 'qtLibs').strip('"').split(',')
             self.libs = config.get('Deployment', 'libs').strip('"').split(',')
 
@@ -349,10 +390,9 @@ class QtDeployment:
             self.targetExtension = '.exe'
             self.libraryExtension = '.dll'
             self.libraryPrefix = ''
+            self.qtBinDir = os.path.join(self.qtDir, 'bin')
             self.zipName = self.pkgName + '.zip'
-            self.qtLibDir = os.path.join(self.qtDir, 'bin')
             self.outLibDir = self.deploymentDir
-            self.outBinDir = self.deploymentDir
         elif (self.platform == 'linux_x86') or (self.platform == 'linux_x64'):
             self.targetExtension = ''
             self.libraryExtension = '.so'
@@ -396,8 +436,13 @@ class QtDeployment:
                 self.deployMac()
             elif 'android' in self.platform:
                 self.deployAndroid()
+            elif 'windows' in self.platform:
+                self.deployWindows()
+            elif 'linux' in self.platform:
+                self.deployLinux()
             else:
-                self.deployFiles()
+                sys.stderr.write('unsupported platform %s\n' % self.platform)
+                sys.exit(1)
         if self.clean:
             self.cleanup()
 
