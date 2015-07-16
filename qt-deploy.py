@@ -89,6 +89,7 @@ class QtDeployment:
         except WindowsError:    # ignore error on windows
             pass
 
+        # resolve VS install path
         vsEnvCmd = None
         vsVersions = ['90', '100', '110', '120', '130']
         for version in vsVersions:
@@ -100,18 +101,28 @@ class QtDeployment:
             sys.stderr.write('Unable to determine Visual Studio version\n')
             sys.exit(1)
 
+        pipe = subprocess.Popen('%s & set VCINSTALLDIR' % vsEnvCmd,
+                                stdout=subprocess.PIPE, shell=True)
+        vcInstallDir = pipe.communicate()[0].strip().split('=')[1]
+        redistDir = os.path.join(vcInstallDir, 'redist', self.arch)
+
         # copy dependencies using windeployqt
         sys.stdout.write("copying dependencies...")
         sys.stdout.flush()
-        currentDir = os.getcwd()
-        os.chdir(self.applicationDir)
         winutil = os.path.join(self.qtBinDir, 'windeployqt.exe')
         cmd = '%s & %s %s' % (vsEnvCmd, winutil, self.target)
         cmd += ' --qmldir %s' % os.path.abspath(self.qmlSourceDir)
         cmd += ' --dir %s' % os.path.abspath(self.deploymentDir)
+        currentDir = os.getcwd()
+        os.chdir(self.applicationDir)
         check_call(cmd, shell=True)
         os.chdir(currentDir)
         sys.stdout.write("done\n")
+
+        # copy target
+        inFile = os.path.join(self.applicationDir, self.target)
+        targetFile = os.path.join(self.outBinDir, self.target)
+        shutil.copyfile(inFile, targetFile)
 
         # copy additional libraries
         if self.libs[0] != '':
@@ -126,6 +137,13 @@ class QtDeployment:
             for lib in self.libs:
                 libName = self.libraryPrefix + lib + self.libraryExtension
                 inPath = os.path.join(self.libDir, libName)
+                # overwrite if redistributable
+                for root, dirs, files in os.walk(redistDir):
+                    for f in files:
+                        if f == libName:
+                            inPath = os.path.join(root, f)
+                            break
+
                 copyLib(inPath, self.outLibDir)
 
             sys.stdout.write("done\n")
@@ -353,6 +371,7 @@ class QtDeployment:
             self.qmlSourceDir = os.path.expanduser(config.get('Deployment', 'qmlSourceDir').strip('"'))
             self.libs = config.get('Deployment', 'libs').strip('"').split(',')
             self.libDir = os.path.expanduser(config.get('Deployment', 'libDir').strip('"'))
+            self.arch = config.get('DEFAULT', 'arch').strip('"')
         elif "android" in self.platform:
             self.androidPlatform = config.get('Deployment', 'androidPlatform').strip('"')
             self.androidKeystore = os.path.expanduser(config.get('Deployment', 'androidKeystore').strip('"'))
@@ -404,6 +423,7 @@ class QtDeployment:
             self.qtBinDir = os.path.join(self.qtDir, 'bin')
             self.zipName = self.pkgName + '.zip'
             self.outLibDir = self.deploymentDir
+            self.outBinDir = self.deploymentDir
         elif (self.platform == 'linux_x86') or (self.platform == 'linux_x64'):
             self.targetExtension = ''
             self.libraryExtension = '.so'
