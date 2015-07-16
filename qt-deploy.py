@@ -89,13 +89,24 @@ class QtDeployment:
         except WindowsError:    # ignore error on windows
             pass
 
+        vsEnvCmd = None
+        vsVersions = ['90', '100', '110', '120', '130']
+        for version in vsVersions:
+            envVar = 'VS%sCOMNTOOLS' % version
+            if os.getenv(envVar):
+                vsEnvCmd = '"%svsvars32.bat"' % os.getenv(envVar)
+                break
+        if vsEnvCmd is None:
+            sys.stderr.write('Unable to determine Visual Studio version\n')
+            sys.exit(1)
+
         # copy dependencies using windeployqt
         sys.stdout.write("copying dependencies...")
         sys.stdout.flush()
         currentDir = os.getcwd()
         os.chdir(self.applicationDir)
         winutil = os.path.join(self.qtBinDir, 'windeployqt.exe')
-        cmd = '%s %s' % (winutil, self.target)
+        cmd = '%s & %s %s' % (vsEnvCmd, winutil, self.target)
         cmd += ' --qmldir %s' % os.path.abspath(self.qmlSourceDir)
         cmd += ' --dir %s' % os.path.abspath(self.deploymentDir)
         check_call(cmd, shell=True)
