@@ -102,12 +102,14 @@ class QtRelease:
         if self.debug:
             printInfo('creating variables')
 
-        if (self.platform == 'windows_x86') or (self.platform == 'windows_x64'):
+        if 'windows' in self.platform:
             self.zipName = self.pkgName + '.zip'
-        elif (self.platform == 'linux_x86') or (self.platform == 'linux_x64'):
+        elif 'linux' in self.platform:
             self.zipName = self.pkgName + '.tar.gz'
         elif (self.platform == 'mac'):
             self.zipName = self.pkgName + '.dmg'
+        elif 'android' in self.platform:
+            self.zipName = self.pkgName + '.apk'
         else:
             printInfo('unknown platform\n')
             exit(1)
