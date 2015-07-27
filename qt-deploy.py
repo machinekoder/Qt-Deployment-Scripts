@@ -256,6 +256,42 @@ class QtDeployment:
                     sys.stderr.write('could not find library %s\n' % libName)
                     exit(1)
 
+        # cleanup symlinks, use library in the style *.so.<major_version>
+        libs = os.listdir(self.outLibDir)
+        libs.sort(key=len)
+        doneList = []
+        for lib in libs:
+            if lib in doneList:  # skip already processed files
+                continue
+            list = [f for f in libs if lib in f]  # list all occurrences
+            target = None
+            match = None
+            for l in list:
+                index = l.find('.so')
+                count = l[index:].count('.')
+                if count == 2:
+                    match = l
+                if not os.path.islink(l):
+                    target = l
+            if target and match:
+                if target == match:
+                    continue
+                target = os.path.join(self.outLibDir, target)
+                match = os.path.join(self.outLibDir, match)
+                tmp = match + '.tmp'
+                shutil.copy(target, tmp)
+                for l in list:
+                    doneList.append(l)
+                    os.remove(os.path.join(self.outLibDir, l))
+                shutil.copy(tmp, match)
+                os.remove(tmp)
+
+        # remove executable bit from libraries
+        for f in os.listdir(self.outLibDir):
+            outFile = os.path.join(self.outLibDir, f)
+            st = os.stat(outFile)
+            os.chmod(outFile, st.st_mode & ~stat.S_IEXEC)
+
         # create the platforms dir
         os.makedirs(self.outPlatformsDir)
 
