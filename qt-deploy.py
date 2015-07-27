@@ -365,7 +365,8 @@ class QtDeployment:
                 runFile.write('/lib/ld-linux.so.2 ')
             else:
                 runFile.write('/lib64/ld-linux-x86-64.so.2 ')
-            runFile.write('"$CWD"/bin/' + self.target + '\n')
+            runFile.write('"$CWD"/bin/' + self.target + ' $@\n')
+            runFile.write('exit $?\n')
             runFile.close()
             st = os.stat(runFilePath)
             os.chmod(runFilePath, st.st_mode | stat.S_IEXEC)
