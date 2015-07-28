@@ -349,7 +349,7 @@ class QtDeployment:
         runFilePath = os.path.join(self.deploymentDir, self.target)
         runFile = open(runFilePath, 'w')
         if runFile:
-            runFile.write('#!/bin/bash\n')
+            runFile.write('#!/usr/bin/env bash\n')
             runFile.write('if [ -z "$BASH_SOURCE" ]; then\n')
             runFile.write('cd "$(dirname "$(readlink -f "$0")")"\n')
             runFile.write('else\n')
