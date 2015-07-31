@@ -62,9 +62,10 @@ class QtDeployment:
         sys.stdout.write("creating disk image...")
         sys.stdout.flush()
         macutil = os.path.join(self.qtBinDir, 'macdeployqt')
+        qmlDir = os.path.abspath(self.qmlSourceDir)
         currentDir = os.getcwd()
         os.chdir(self.applicationDir)
-        check_call(macutil + ' ' + self.target + ' -qmldir=' + os.path.abspath(self.qmlSourceDir) + ' -dmg', shell=True)
+        check_call('%s %s -qmldir=%s -dmg -verbose=2' % (macutil,  self.target, qmlDir), shell=True)
         os.chdir(currentDir)
         sys.stdout.write("done\n")
 
