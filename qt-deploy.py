@@ -361,7 +361,7 @@ class QtDeployment:
             runFile.write('export QML_IMPORT_PATH="$CWD"/qml\n')
             runFile.write('export QML2_IMPORT_PATH="$CWD"/qml\n')
             runFile.write('export QT_QPA_PLATFORM_PLUGIN_PATH="$CWD"/platforms\n')
-            runFile.write('export QT_PLUGIN_PATH="$CWD"\n')
+            runFile.write('export QT_PLUGIN_PATH="$CWD"/plugins\n')
             if (self.platform == 'linux_x86'):
                 runFile.write('/lib/ld-linux.so.2 ')
             else:
@@ -492,7 +492,7 @@ class QtDeployment:
         self.qmlDir = os.path.join(self.qtDir, 'qml')
         self.pluginDir = os.path.join(self.qtDir, 'plugins')
         self.platformsDir = os.path.join(self.qtDir, 'plugins/platforms')
-        self.outPluginDir = self.deploymentDir
+        self.outPluginDir = os.path.join(self.deploymentDir, 'plugins')
         self.outPlatformsDir = os.path.join(self.deploymentDir, 'platforms')
         self.outQmlDir = os.path.join(self.deploymentDir, 'qml')
 
