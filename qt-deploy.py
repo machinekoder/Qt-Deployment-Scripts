@@ -382,6 +382,12 @@ class QtDeployment:
             mytar.close()
         sys.stdout.write("done\n")
 
+    def preparePath(self, path):
+        path = os.path.expanduser(path)
+        if (len(path) > 0) and (path[0] == '.'):
+            path = os.path.abspath(path)
+        return path
+
     def parseConfig(self):
         if self.debug:
             print("parsing config file")
@@ -399,29 +405,29 @@ class QtDeployment:
         except:
             self.version = None
         self.platform = config.get('Deployment', 'platform').strip('"')
-        self.qtDir = os.path.expanduser(config.get('Deployment', 'qtDir').strip('"'))
-        self.applicationDir = os.path.expanduser(config.get('Deployment', 'applicationDir').strip('"'))
-        self.pkgName = os.path.expanduser(config.get('Deployment', 'pkgName').strip('"'))
+        self.qtDir = self.preparePath(config.get('Deployment', 'qtDir').strip('"'))
+        self.applicationDir = self.preparePath(config.get('Deployment', 'applicationDir').strip('"'))
+        self.pkgName = self.preparePath(config.get('Deployment', 'pkgName').strip('"'))
         if self.platform == "mac":
-            self.qmlSourceDir = os.path.expanduser(config.get('Deployment', 'qmlSourceDir').strip('"'))
+            self.qmlSourceDir = self.preparePath(config.get('Deployment', 'qmlSourceDir').strip('"'))
         elif "windows" in self.platform:
-            self.deploymentDir = os.path.expanduser(config.get('Deployment', 'deploymentDir').strip('"'))
-            self.qmlSourceDir = os.path.expanduser(config.get('Deployment', 'qmlSourceDir').strip('"'))
+            self.deploymentDir = self.preparePath(config.get('Deployment', 'deploymentDir').strip('"'))
+            self.qmlSourceDir = self.preparePath(config.get('Deployment', 'qmlSourceDir').strip('"'))
             self.libs = config.get('Deployment', 'libs').strip('"').split(',')
-            self.libDir = os.path.expanduser(config.get('Deployment', 'libDir').strip('"'))
+            self.libDir = self.preparePath(config.get('Deployment', 'libDir').strip('"'))
             self.arch = config.get('DEFAULT', 'arch').strip('"')
         elif "android" in self.platform:
             self.androidPlatform = config.get('Deployment', 'androidPlatform').strip('"')
-            self.androidKeystore = os.path.expanduser(config.get('Deployment', 'androidKeystore').strip('"'))
+            self.androidKeystore = self.preparePath(config.get('Deployment', 'androidKeystore').strip('"'))
             self.androidKey = config.get('Deployment', 'androidKey').strip('"')
-            self.androidStorepassCmd = os.path.expanduser(config.get('Deployment', 'androidStorepassCmd').strip('"'))
-            self.androidKeypassCmd = os.path.expanduser(config.get('Deployment', 'androidKeypassCmd').strip('"'))
+            self.androidStorepassCmd = self.preparePath(config.get('Deployment', 'androidStorepassCmd').strip('"'))
+            self.androidKeypassCmd = self.preparePath(config.get('Deployment', 'androidKeypassCmd').strip('"'))
         else:
-            self.deploymentDir = os.path.expanduser(config.get('Deployment', 'deploymentDir').strip('"'))
+            self.deploymentDir = self.preparePath(config.get('Deployment', 'deploymentDir').strip('"'))
             rawLibDirs = config.get('Deployment', 'libDir').strip('"').split(',')
             self.libDirs = []
             for libDir in rawLibDirs:
-                self.libDirs.append(os.path.expanduser(libDir))
+                self.libDirs.append(self.preparePath(libDir))
             self.qmlPlugins = config.get('Deployment', 'qmlPlugins').strip('"').split(',')
             self.qtPlugins = config.get('Deployment', 'qtPlugins').strip('"').split(',')
             self.platformPlugins = config.get('Deployment', 'platformPlugins').strip('"').split(',')
