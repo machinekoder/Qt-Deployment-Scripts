@@ -75,6 +75,12 @@ class QtDeployment:
         shutil.move(inPath, self.zipName)
         sys.stdout.write("done\n")
 
+        sys.stdout.write("moving app bundle...")
+        sys.stdout.flush()
+        inPath = os.path.join(self.applicationDir, self.target)
+        shutil.move(inPath, self.targetOriginal)
+        sys.stdout.write("done\n")
+
         sys.stdout.write("cleaning app bundle...")
         sys.stdout.flush()
         targetBundle = os.path.join(self.applicationDir, self.target)
@@ -495,6 +501,7 @@ class QtDeployment:
             self.qtDir = os.path.join(self.qtDir, 'lib')
 
         self.target = self.name.lower() + self.targetExtension
+        self.targetOriginal = self.pkgName + self.targetExtension
         self.qmlDir = os.path.join(self.qtDir, 'qml')
         self.pluginDir = os.path.join(self.qtDir, 'plugins')
         self.platformsDir = os.path.join(self.qtDir, 'plugins/platforms')
