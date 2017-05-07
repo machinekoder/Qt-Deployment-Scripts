@@ -54,6 +54,9 @@ class QtDeployment:
         if os.path.isfile(self.zipName):
             os.remove(self.zipName)
 
+        if os.path.exists(self.targetOriginal):
+            shutil.rmtree(self.targetOriginal)
+
         sys.stdout.write("done\n")
 
     def deployMac(self):
