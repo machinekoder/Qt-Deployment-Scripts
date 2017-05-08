@@ -81,7 +81,7 @@ class QtDeployment:
         sys.stdout.write("moving app bundle...")
         sys.stdout.flush()
         inPath = os.path.join(self.applicationDir, self.target)
-        shutil.move(inPath, self.targetOriginal)
+        shutil.copytree(inPath, self.targetOriginal)
         sys.stdout.write("done\n")
 
         sys.stdout.write("cleaning app bundle...")
