@@ -54,6 +54,9 @@ class QtDeployment:
         if os.path.isfile(self.zipName):
             os.remove(self.zipName)
 
+        if os.path.exists(self.targetOriginal):
+            shutil.rmtree(self.targetOriginal)
+
         sys.stdout.write("done\n")
 
     def deployMac(self):
@@ -73,6 +76,12 @@ class QtDeployment:
         sys.stdout.flush()
         inPath = os.path.join(self.applicationDir, self.dmgName)
         shutil.move(inPath, self.zipName)
+        sys.stdout.write("done\n")
+
+        sys.stdout.write("moving app bundle...")
+        sys.stdout.flush()
+        inPath = os.path.join(self.applicationDir, self.target)
+        shutil.copytree(inPath, self.targetOriginal)
         sys.stdout.write("done\n")
 
         sys.stdout.write("cleaning app bundle...")
@@ -495,6 +504,7 @@ class QtDeployment:
             self.qtDir = os.path.join(self.qtDir, 'lib')
 
         self.target = self.name.lower() + self.targetExtension
+        self.targetOriginal = self.pkgName + self.targetExtension
         self.qmlDir = os.path.join(self.qtDir, 'qml')
         self.pluginDir = os.path.join(self.qtDir, 'plugins')
         self.platformsDir = os.path.join(self.qtDir, 'plugins/platforms')
